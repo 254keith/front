@@ -753,6 +753,39 @@ const Footer = styled.footer`
   font-size: 0.9rem;
 `;
 
+// New styled component for the featured anime description
+const FeaturedDescription = styled.p`
+  font-size: 1.2rem;
+  margin-bottom: 32px;
+  color: #fff;
+  text-shadow: 0 2px 8px #000;
+  line-height: 1.5;
+  ${props => !props.showFull && `
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* Limit to 3 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  `}
+`;
+
+const ReadMoreButton = styled.button`
+  background: rgba(0,0,0,0.5);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  transition: background 0.3s ease;
+
+  &:hover {
+    background: rgba(0,0,0,0.7);
+  }
+`;
+
+
 // ===== MAIN COMPONENT =====
 export default function Home() {
   // ===== STATE =====
@@ -785,6 +818,9 @@ export default function Home() {
     popular: 8,
     recent: 8
   });
+
+  // State for Featured Anime Description visibility
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   // Re-added states for Reviews and Newsletter
   const [reviews, setReviews] = useState([]);
@@ -953,7 +989,7 @@ export default function Home() {
 
         // Handle different possible API response structures
         let genreFilteredList = [];
-        
+
         if (res && typeof res === 'object') {
           // Try different possible response structures
           if (Array.isArray(res)) {
@@ -992,7 +1028,7 @@ export default function Home() {
 
         console.log(`Genre filtered list for "${genre}":`, genreFilteredList);
         setSearchResults(genreFilteredList);
-        
+
         if (genreFilteredList.length === 0) {
           setError(`No anime found for genre "${genre}". Try a different genre.`);
         }
@@ -1490,10 +1526,10 @@ export default function Home() {
                   >
                     <div
                       style={{
-                        fontFamily: 'Impact, Oswald, Arial Black, sans-serif',
+                        fontFamily: 'Lobster, cursive', /* Apply Lobster font */
                         fontSize: '4rem',
                         fontWeight: 'bold',
-                        color: '#ff2222',
+                        color: 'var(--accent)', /* Change to blue (accent color) */
                         textShadow: '3px 3px 0 #000, 0 0 20px #000',
                         letterSpacing: 2,
                         marginBottom: 24,
@@ -1503,10 +1539,16 @@ export default function Home() {
                     >
                       {anime.title}
                     </div>
-                    <div style={{ fontSize: '1.2rem', marginBottom: 32, color: '#fff', textShadow: '0 2px 8px #000' }}>
+                    {/* Use FeaturedDescription component */}
+                    <FeaturedDescription showFull={showFullDescription}>
                       {anime.synopsis || anime.description || 'No description available.'}
-                    </div>
-                    <div style={{ display: 'flex', gap: 16 }}>
+                    </FeaturedDescription>
+                    {(anime.synopsis && anime.synopsis.split('\n').length > 3) || (anime.description && anime.description.split('\n').length > 3) || (anime.synopsis?.length > 200 || anime.description?.length > 200) ? (
+                        <ReadMoreButton onClick={() => setShowFullDescription(prev => !prev)}>
+                            {showFullDescription ? 'Read Less' : 'Read More'}
+                        </ReadMoreButton>
+                    ) : null}
+                    <div style={{ display: 'flex', gap: 16, marginTop: '20px' }}> {/* Added marginTop for spacing */}
                       <button
                         style={{
                           background: '#ff6600',
