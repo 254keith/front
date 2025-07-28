@@ -749,6 +749,7 @@
 // }
 // src/components/Home.jsx
 // frontend/src/components/Home.jsx
+// src/components/Home.jsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -772,7 +773,7 @@ import {
   FaHeart,
 } from "react-icons/fa";
 
-// ───── Styled Components (from your provided code - no changes) ────────────────
+// ───── Styled Components (No Changes - using your provided code) ────────────────
 const HomeContainer = styled.div`
   padding-left: 6rem;
   background: var(--bg-primary);
@@ -1154,6 +1155,13 @@ const ModalContent = styled.div`
   max-height: 90vh;
   overflow-y: auto;
 `;
+const modalModalEpisode = styled.div`
+  background: var(--bg-secondary);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+`;
 
 const CloseButton = styled.button`
   position: absolute;
@@ -1227,11 +1235,11 @@ export default function Home() {
         const home = response.data || response;
 
         setTrending(home.trending || []);
-        setPopular(home.mostPopular || []); // Corrected to mostPopular
-        setUpcoming(home.topUpcoming || []); // Corrected to topUpcoming
-        setRecent(home.latestEpisode || []); // Corrected to latestEpisode
-        setFeatured(home.spotlight || home.top10?.today || []); // Use spotlight first, then top10.today
-        setReviews(home.reviews || []); // Assuming reviews come from home data
+        setPopular(home.mostPopular || []);
+        setUpcoming(home.topUpcoming || []);
+        setRecent(home.latestEpisode || []);
+        setFeatured(home.spotlight || home.top10?.today || []);
+        setReviews(home.reviews || []);
         setGenres(home.genres || []);
 
         // Load favorites from localStorage
@@ -1241,7 +1249,7 @@ export default function Home() {
         }
       } catch (err) {
         console.error("Failed to load home data:", err);
-        setError("Failed to load data. Please try again later. (Check backend logs for CORS!)"); // Improved error message
+        setError("Failed to load data. Please try again later. (Check backend logs for CORS!)");
       } finally {
         setIsLoading(false);
       }
@@ -1256,7 +1264,7 @@ export default function Home() {
   }, [favorites]);
 
   const handleSearch = useCallback(
-    (e) => { // Removed `async` here, moved to the setTimeout callback
+    (e) => {
       const term = e.target.value;
       setSearchTerm(term);
 
@@ -1264,7 +1272,7 @@ export default function Home() {
         clearTimeout(debounceTimeoutRef.current);
       }
 
-      debounceTimeoutRef.current = setTimeout(async () => { // Async logic inside debounce
+      debounceTimeoutRef.current = setTimeout(async () => {
         if (!term) {
           setSearchResults([]);
           setActiveGenre(null);
@@ -1288,14 +1296,13 @@ export default function Home() {
         } finally {
           setIsLoading(false);
         }
-      }, 500); // Debounce for 500ms
+      }, 500);
     },
     [sortOption]
   );
 
   const handleSort = useCallback((e) => {
     setSortOption(e.target.value);
-    // Re-sort current search results immediately
     setSearchResults(prev => [...prev].sort((a, b) =>
         e.target.value === "A-Z"
           ? a.title.localeCompare(b.title)
@@ -1305,25 +1312,50 @@ export default function Home() {
 
   const filterByGenre = useCallback(
     async (genre) => {
-      // Toggle genre filter off if already active
       if (activeGenre === genre) {
         setActiveGenre(null);
-        setSearchResults([]); // Clear search results if filter is removed
+        setSearchResults([]);
         return;
       }
 
       setActiveGenre(genre);
       try {
         setIsLoading(true);
-        // Corrected API call based on your JSON (genres list should be direct)
-        // Assuming fetchAnimeList('genres', genre) would work if your backend supports it
-        // Or you might need a different API route for filtering by genre.
-        // Based on your api.js `fetchAnimeList(query, category = '', page = 1)`
-        // it seems designed for this: query='genre', category=genreName
         const res = await fetchAnimeList("genre", genre, 1);
         console.log(`🎨 fetchAnimeList("genre", "${genre}") →`, res);
-        const list = res.results || res.data?.results || res.data || [];
-        setSearchResults(list);
+
+        // --- THE CRITICAL FIX IS HERE ---
+        // Your API response for genre filter needs to be explicitly accessed.
+        // Based on your previous JSON, it's likely within `res.data.mostPopular`
+        // or another specific category when a genre filter is applied.
+        let genreFilteredList = [];
+        if (res.data) {
+          // You need to decide which list `res.data` will provide
+          // when filtered by genre. Your previous JSON had:
+          // res.data: {
+          //   "spotlight": [],
+          //   "trending": [],
+          //   "topAiring": [],
+          //   "mostPopular": [... anime list for 'josei' was here],
+          //   ...
+          // }
+          // So if `fetchAnimeList("genre", genre, 1)` gives you the full
+          // categorized object, you must pick the correct list.
+          // For now, let's assume it puts the filtered results into `mostPopular` or `trending`
+          // or a more specific `genreResults` property if your backend returns it that way.
+          genreFilteredList = res.data.mostPopular || res.data.trending || res.data.spotlight || [];
+
+          // If your backend changes to provide a dedicated 'filtered' list:
+          // genreFilteredList = res.data.filteredGenreResults || [];
+          // Or if the API directly returns the array when filtering by genre:
+          // genreFilteredList = res.data || [];
+        } else if (res.results) { // Fallback for `res.results` if API structure varies
+          genreFilteredList = res.results;
+        } else {
+          genreFilteredList = []; // Default to empty array
+        }
+
+        setSearchResults(genreFilteredList); // Set the explicitly extracted list
       } catch (err) {
         console.error("Genre filter error:", err);
         setError("Failed to filter by genre. Please try again.");
@@ -1331,7 +1363,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [activeGenre] // Dependency to toggle active genre
+    [activeGenre]
   );
 
   const toggleFav = useCallback(
@@ -1350,15 +1382,15 @@ export default function Home() {
   const openModal = useCallback(
     async (anime) => {
       try {
-        setIsLoading(true); // Indicate loading for modal details
+        setIsLoading(true);
         const details = await fetchAnimeDetails(anime.id);
         console.log("[API] fetchAnimeDetails →", details);
         setModalAnime(details);
-        setModalEpisode(null); // Reset episode when opening new modal
+        setModalEpisode(null);
         setShowModal(true);
       } catch (err) {
         console.error("Modal load error:", err);
-        setError("Failed to load anime details."); // Set error for modal
+        setError("Failed to load anime details.");
       } finally {
         setIsLoading(false);
       }
@@ -1383,12 +1415,10 @@ export default function Home() {
       }
 
       try {
-        // In a real app, you would call your API here to subscribe the email
-        // Example: await subscribeNewsletter(newsletterEmail);
         console.log("Subscribing email:", newsletterEmail);
         alert(`Thank you for subscribing with ${newsletterEmail}!`);
         setNewsletterEmail("");
-        setError(null); // Clear any previous errors
+        setError(null);
       } catch (err) {
         console.error("Newsletter error:", err);
         setError("Subscription failed. Please try again.");
@@ -1411,19 +1441,17 @@ export default function Home() {
       }
 
       try {
-        // In a real app, you would call your API here to submit the review
-        // Example: await postReview({ name, rating, comment });
         const newReview = {
-          id: Date.now(), // Use a real ID from backend if submitting
+          id: Date.now(),
           name,
           rating,
           comment,
-          avatar: `https://i.pravatar.cc/150?u=${Date.now()}`, // Placeholder avatar
+          avatar: `https://i.pravatar.cc/150?u=${Date.now()}`,
         };
 
-        setReviews((prev) => [newReview, ...prev]); // Add new review to top
-        form.reset(); // Clear form
-        setError(null); // Clear any previous errors
+        setReviews((prev) => [newReview, ...prev]);
+        form.reset();
+        setError(null);
         alert("Review submitted successfully!");
       } catch (err) {
         console.error("Review submission error:", err);
@@ -1433,11 +1461,9 @@ export default function Home() {
     []
   );
 
-  // Determine which list to display
   const displayList = searchTerm || activeGenre ? searchResults : null;
 
-  // Basic Loading / Error Display
-  if (isLoading && !displayList && !error && trending.length === 0) { // Initial load
+  if (isLoading && !displayList && !error && trending.length === 0) {
     return (
       <HomeContainer>
         <div style={{ textAlign: "center", padding: "2rem", fontSize: "1.5rem" }}>
@@ -1447,7 +1473,6 @@ export default function Home() {
     );
   }
 
-  // General error display, can be more specific
   if (error && !isLoading) {
     return (
       <HomeContainer>
@@ -1478,7 +1503,7 @@ export default function Home() {
       {/* Search & Sort */}
       <SearchContainer>
         <SearchInput
-          type="text" // Ensure type is text
+          type="text"
           value={searchTerm}
           onChange={handleSearch}
           placeholder="Search for anime..."
@@ -1488,7 +1513,7 @@ export default function Home() {
           id="sort"
           value={sortOption}
           onChange={handleSort}
-          disabled={!displayList || displayList.length === 0} // Disable sort if no results
+          disabled={!displayList || displayList.length === 0}
         >
           <option value="A-Z">A–Z</option>
           <option value="Z-A">Z–A</option>
@@ -1512,7 +1537,7 @@ export default function Home() {
       </GenreFilterContainer>
 
       {/* Search/Filter Results */}
-      {(searchTerm || activeGenre) && ( // Only show this section if search or genre is active
+      {(searchTerm || activeGenre) && (
         <>
           <SectionTitle>
             Results {activeGenre && `for ${activeGenre}`}
@@ -1533,9 +1558,9 @@ export default function Home() {
                     <FaHeart />
                   </FavoriteButton>
                   <AnimeImage
-                    src={a.poster || a.image || "https://via.placeholder.com/200x300"} // Use poster first, then image
+                    src={a.poster || a.image || "https://via.placeholder.com/200x300"}
                     alt={a.title}
-                    loading="lazy" // Lazy load images
+                    loading="lazy"
                     onError={(e) => {
                       e.target.src = "https://via.placeholder.com/200x300";
                     }}
@@ -1567,18 +1592,18 @@ export default function Home() {
             modules={[Navigation, Pagination, Autoplay]}
             navigation
             pagination={{ clickable: true }}
-            autoplay={{ delay: 4000, disableOnInteraction: false }} // Added disableOnInteraction
+            autoplay={{ delay: 4000, disableOnInteraction: false }}
             loop
             style={{ padding: "0 1rem" }}
-            slidesPerView={1} // Only show one slide at a time for featured
+            slidesPerView={1}
           >
             {featured.map((a) => (
               <SwiperSlide key={a.id}>
                 <FeaturedCard onClick={() => openModal(a)}>
                   <FeaturedImage
-                    src={a.poster || a.image || "https://via.placeholder.com/800x400"} // Use poster first
+                    src={a.poster || a.image || "https://via.placeholder.com/800x400"}
                     alt={a.title}
-                    loading="lazy" // Lazy load images
+                    loading="lazy"
                     onError={(e) => {
                       e.target.src = "https://via.placeholder.com/800x400";
                     }}
@@ -1865,7 +1890,7 @@ export default function Home() {
               >
                 <iframe
                   src={modalEpisode.videoUrl}
-                  title={`${modalAnime.title} Ep ${modalEpisode.episodeNumber}`}
+                  title={`${modalAnime.title} Ep ${modalModalEpisode.episodeNumber}`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                   style={{
