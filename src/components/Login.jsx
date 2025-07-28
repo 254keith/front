@@ -1,9 +1,10 @@
+// frontend/src/components/Login.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaGoogle, FaDiscord, FaGithub } from 'react-icons/fa';
 import styled, { keyframes } from 'styled-components';
 import { loginUser } from '../api';
-import logo from './download.png';
+import logo from './download.png'; // Assuming logo is in the same directory
 
 const float = keyframes`
   0% { transform: translateY(0px); }
@@ -117,14 +118,14 @@ const SubmitButton = styled.button`
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-top: 1rem;
-  
-  &:hover:not(:disabled) { /* Added :not(:disabled) */
+
+  &:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
   }
-  
+
   &:disabled {
-    background: #555; /* Changed disabled background */
+    background: #555;
     cursor: not-allowed;
     opacity: 0.7;
   }
@@ -182,29 +183,30 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setApiError(''); // Clear previous errors
-    setSuccess(false); // Clear previous success messages
+    setApiError('');
+    setSuccess(false);
     setLoading(true);
     try {
       const data = await loginUser(formData);
-      // Assuming your backend sends a `token` or similar upon successful login
-      if (data.user) { // Check for `user` object as per your backend controller
-        // You might receive a token in a `data.token` field or similar
-        // If not, you might need to implement token generation in your backend and send it.
-        localStorage.setItem('user', JSON.stringify(data.user)); // Store user data (e.g., ID, username)
-        // localStorage.setItem('token', data.token); // If your backend returns a token
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        // You might receive a token in a `data.token` field or similar from your backend
+        // If your backend issues JWTs, store it here: localStorage.setItem('token', data.token);
         setSuccess(true);
-        setTimeout(() => navigate('/'), 1500); // Redirect to home on success
+        setTimeout(() => navigate('/'), 1500);
       } else {
-          setApiError("Login failed: Unexpected response from server."); // Generic error if no user data
+          setApiError("Login failed: Unexpected response from server.");
       }
     } catch (err) {
-      console.error("Login API error:", err); // Log the full error for debugging
-      setApiError(err.message || 'Login failed. Please check your credentials.'); // Display user-friendly error
+      console.error("Login API error:", err);
+      setApiError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Define your backend's base URL for direct links
+  const BACKEND_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://vercel-vooy.onrender.com/api/v1';
 
   return (
     <LoginContainer>
@@ -222,7 +224,7 @@ const Login = () => {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               required
-              disabled={loading} // Disable input while loading
+              disabled={loading}
             />
           </FormGroup>
           <FormGroup>
@@ -232,7 +234,7 @@ const Login = () => {
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               required
-              disabled={loading} // Disable input while loading
+              disabled={loading}
             />
             <PasswordToggle onClick={() => setShowPassword(!showPassword)}>
               {showPassword ? <FaEyeSlash /> : <FaEye />}
@@ -248,15 +250,22 @@ const Login = () => {
           <Link to="/signup">Create New Account</Link>
         </Links>
         <SocialLogin>
-          <SocialIcon>
-            <FaGoogle color="#fff" />
-          </SocialIcon>
-          <SocialIcon>
-            <FaDiscord color="#fff" />
-          </SocialIcon>
-          <SocialIcon>
-            <FaGithub color="#fff" />
-          </SocialIcon>
+          {/* Direct link to your backend's Google OAuth initiation endpoint */}
+          <a href={`${BACKEND_BASE_URL}/auth/google`} style={{ textDecoration: 'none' }}>
+            <SocialIcon>
+              <FaGoogle color="#fff" />
+            </SocialIcon>
+          </a>
+          <a href={`${BACKEND_BASE_URL}/auth/discord`} style={{ textDecoration: 'none' }}>
+            <SocialIcon>
+              <FaDiscord color="#fff" />
+            </SocialIcon>
+          </a>
+          <a href={`${BACKEND_BASE_URL}/auth/github`} style={{ textDecoration: 'none' }}>
+            <SocialIcon>
+              <FaGithub color="#fff" />
+            </SocialIcon>
+          </a>
         </SocialLogin>
       </LoginBox>
     </LoginContainer>

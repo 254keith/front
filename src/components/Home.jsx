@@ -748,7 +748,8 @@
 //   );
 // }
 // src/components/Home.jsx
-import React, { useEffect, useState, useCallback, useRef } from "react"; // Added useRef
+// frontend/src/components/Home.jsx
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import styled from "styled-components";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
@@ -771,8 +772,7 @@ import {
   FaHeart,
 } from "react-icons/fa";
 
-// ───── Styled Components (No changes from your provided file) ─────────────────
-// (Paste your styled components code here as you provided it in Home.jsx)
+// ───── Styled Components (from your provided code - no changes) ────────────────
 const HomeContainer = styled.div`
   padding-left: 6rem;
   background: var(--bg-primary);
@@ -1214,7 +1214,7 @@ export default function Home() {
   const [error, setError] = useState(null);
 
   // For debouncing search
-  const debounceTimeoutRef = useRef(null); 
+  const debounceTimeoutRef = useRef(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -1224,7 +1224,7 @@ export default function Home() {
         const response = await fetchHome();
         console.log("[API] fetchHome →", response);
         // Ensure response.data is used if the API wraps it, otherwise use response directly
-        const home = response.data || response; 
+        const home = response.data || response;
 
         setTrending(home.trending || []);
         setPopular(home.mostPopular || []); // Corrected to mostPopular
@@ -1318,8 +1318,6 @@ export default function Home() {
         // Corrected API call based on your JSON (genres list should be direct)
         // Assuming fetchAnimeList('genres', genre) would work if your backend supports it
         // Or you might need a different API route for filtering by genre.
-        // For now, if your backend doesn't have a specific genre filter,
-        // you might search by keyword = genre or fetch all and filter client-side.
         // Based on your api.js `fetchAnimeList(query, category = '', page = 1)`
         // it seems designed for this: query='genre', category=genreName
         const res = await fetchAnimeList("genre", genre, 1);
@@ -1872,8 +1870,8 @@ export default function Home() {
                   allowFullScreen
                   style={{
                     position: "absolute",
-                    width: "100%",
-                    height: "100%",
+                    width: "100%;",
+                    height: "100%;",
                     border: 0,
                     borderRadius: "8px",
                   }}

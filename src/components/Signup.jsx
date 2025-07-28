@@ -1,3 +1,4 @@
+// frontend/src/components/Signup.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaGoogle, FaGithub, FaDiscord, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
@@ -16,7 +17,7 @@ const fadeIn = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-// Styled Components
+// Styled Components (from your provided code - no changes)
 const SignupContainer = styled.div`
   min-height: 100vh;
   display: flex;
@@ -76,7 +77,7 @@ const Input = styled.input`
   color: #fff;
   font-size: 1rem;
   transition: all 0.3s ease;
-  
+
   &:focus {
     outline: none;
     border-color: #06b6d4;
@@ -112,7 +113,7 @@ const PasswordStrength = styled.div`
     top: 0;
     height: 100%;
     width: ${props => props.strength}%;
-    background: ${props => 
+    background: ${props =>
       props.strength < 25 ? '#ff4757' :
       props.strength < 50 ? '#ffa502' :
       props.strength < 75 ? '#1e90ff' : '#2ed573'};
@@ -122,7 +123,7 @@ const PasswordStrength = styled.div`
 
 const StrengthLabel = styled.div`
   font-size: 0.75rem;
-  color: ${props => 
+  color: ${props =>
     props.strength < 25 ? '#ff4757' :
     props.strength < 50 ? '#ffa502' :
     props.strength < 75 ? '#1e90ff' : '#2ed573'};
@@ -285,7 +286,7 @@ const Signup = () => {
     address: '',
     terms: false
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [passwordStrengthLabel, setPasswordStrengthLabel] = useState('');
@@ -300,19 +301,19 @@ const Signup = () => {
     if (password.match(/[A-Z]/)) strength += 25;
     if (password.match(/[0-9]/)) strength += 25;
     if (password.match(/[^A-Za-z0-9]/)) strength += 25;
-    
+
     let label = '';
     if (strength < 25) label = 'Very Weak';
     else if (strength < 50) label = 'Weak';
     else if (strength < 75) label = 'Good';
     else label = 'Strong';
-    
+
     return { strength, label };
   };
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    
+
     if (field === 'password') {
       const { strength, label } = checkPasswordStrength(value);
       setPasswordStrength(strength);
@@ -322,39 +323,39 @@ const Signup = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
     } else if (formData.username.length < 3) {
       newErrors.username = 'Username must be at least 3 characters';
     }
-    
+
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email address';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
-    } else if (passwordStrength < 50) {
+    } else if (passwordStrength < 50) { // Require at least "Weak" strength for signup
       newErrors.password = 'Password too weak';
     }
-    
+
     if (formData.phone && !/^\d{10,15}$/.test(formData.phone.replace(/\D/g, ''))) {
       newErrors.phone = 'Invalid phone number';
     }
-    
+
     if (!formData.terms) {
       newErrors.terms = 'You must accept the terms and conditions';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -404,26 +405,29 @@ const Signup = () => {
     }
   }, [submitted]);
 
+  // Define your backend's base URL for direct links
+  const BACKEND_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://vercel-vooy.onrender.com/api/v1';
+
   return (
     <SignupContainer>
       <NeonGlow style={{ top: '-50%', left: '-10%' }} />
       <NeonGlow style={{ bottom: '-50%', right: '-10%' }} />
-      
+
       <SignupCard>
         <Title>Join the Anime Universe</Title>
-        
+
         {submitted && (
           <SuccessMessage>
             <FaCheck /> Registration successful! Redirecting to login...
           </SuccessMessage>
         )}
-        
+
         {apiError && (
           <ErrorMessage>
             <FaExclamationTriangle /> {apiError}
           </ErrorMessage>
         )}
-        
+
         <form onSubmit={handleSubmit}>
           <FormGroup>
             <Input
@@ -440,7 +444,7 @@ const Signup = () => {
               </ErrorText>
             )}
           </FormGroup>
-          
+
           <FormGroup>
             <Input
               type="text"
@@ -456,7 +460,7 @@ const Signup = () => {
               </ErrorText>
             )}
           </FormGroup>
-          
+
           <FormGroup>
             <Input
               type="email"
@@ -472,7 +476,7 @@ const Signup = () => {
               </ErrorText>
             )}
           </FormGroup>
-          
+
           <FormGroup>
             <Input
               type={showPassword ? 'text' : 'password'}
@@ -485,7 +489,7 @@ const Signup = () => {
             <TogglePassword onClick={() => setShowPassword(!showPassword)}>
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </TogglePassword>
-            
+
             {formData.password && (
               <>
                 <PasswordStrength strength={passwordStrength} />
@@ -494,14 +498,14 @@ const Signup = () => {
                 </StrengthLabel>
               </>
             )}
-            
+
             {errors.password && (
               <ErrorText>
                 <FaExclamationTriangle size={12} /> {errors.password}
               </ErrorText>
             )}
           </FormGroup>
-          
+
           <FormGroup>
             <Input
               type="tel"
@@ -517,7 +521,7 @@ const Signup = () => {
               </ErrorText>
             )}
           </FormGroup>
-          
+
           <FormGroup>
             <Input
               type="text"
@@ -527,23 +531,23 @@ const Signup = () => {
               onChange={(e) => handleInputChange("address", e.target.value)}
             />
           </FormGroup>
-          
+
           <CheckboxContainer>
-            <input 
-              type="checkbox" 
-              name="terms" 
+            <input
+              type="checkbox"
+              name="terms"
               checked={formData.terms}
               onChange={(e) => handleInputChange("terms", e.target.checked)}
             />
-            I agree to the <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a>
+            I agree to the <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>
           </CheckboxContainer>
           {errors.terms && (
             <ErrorText>
               <FaExclamationTriangle size={12} /> {errors.terms}
             </ErrorText>
           )}
-          
-          <SubmitButton 
+
+          <SubmitButton
             type="submit"
             disabled={!formData.terms || passwordStrength < 50 || loading}
           >
@@ -554,19 +558,20 @@ const Signup = () => {
             ) : 'Create Account'}
           </SubmitButton>
         </form>
-        
+
         <SocialLogin>
-          <SocialButton onClick={() => window.open(`${process.env.REACT_APP_API_BASE_URL || 'https://vercel-vooy.onrender.com/api/v1'}/auth/google`, '_self')}>
+          {/* Direct links to your backend's OAuth initiation endpoints */}
+          <SocialButton onClick={() => window.open(`${BACKEND_BASE_URL}/auth/google`, '_self')}>
             <FaGoogle /> Google
           </SocialButton>
-          <SocialButton onClick={() => window.open(`${process.env.REACT_APP_API_BASE_URL || 'https://vercel-vooy.onrender.com/api/v1'}/auth/github`, '_self')}>
+          <SocialButton onClick={() => window.open(`${BACKEND_BASE_URL}/auth/github`, '_self')}>
             <FaGithub /> GitHub
           </SocialButton>
-          <SocialButton onClick={() => window.open(`${process.env.REACT_APP_API_BASE_URL || 'https://vercel-vooy.onrender.com/api/v1'}/auth/discord`, '_self')}>
+          <SocialButton onClick={() => window.open(`${BACKEND_BASE_URL}/auth/discord`, '_self')}>
             <FaDiscord /> Discord
           </SocialButton>
         </SocialLogin>
-        
+
         <LoginLink>
           Already have an account? <Link to="/login">Sign In</Link>
         </LoginLink>

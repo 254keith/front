@@ -1,3 +1,4 @@
+// frontend/src/components/Forgot.jsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaEnvelope, FaCheck, FaSpinner, FaShieldAlt } from 'react-icons/fa';
@@ -79,7 +80,7 @@ const Input = styled.input`
   color: #fff;
   font-size: 1rem;
   transition: all 0.3s ease;
-  
+
   &:focus {
     outline: none;
     border-color: #06b6d4;
@@ -196,6 +197,7 @@ const ForgotPassword = () => {
 
     setLoading(true);
     try {
+      // The forgotPassword function in your api.js already handles json parsing and error throwing
       await forgotPassword(email);
       setSubmitted(true);
       setError('');
@@ -211,7 +213,7 @@ const ForgotPassword = () => {
       <SecurityShield>
         <FaShieldAlt />
       </SecurityShield>
-      
+
       <ForgotCard>
         <Title>Reset Your Password</Title>
         <Instructions>
@@ -238,7 +240,7 @@ const ForgotPassword = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               error={!!error}
-              disabled={submitted}
+              disabled={submitted || loading} // Disable input while loading or submitted
             />
           </FormGroup>
 
@@ -247,13 +249,14 @@ const ForgotPassword = () => {
               type="checkbox"
               checked={isHuman}
               onChange={(e) => setIsHuman(e.target.checked)}
+              disabled={submitted || loading} // Disable checkbox while loading or submitted
             />
             <span>I'm not a robot</span>
           </SecurityCheck>
 
-          <SubmitButton 
-            type="submit" 
-            disabled={loading || submitted}
+          <SubmitButton
+            type="submit"
+            disabled={loading || submitted || !isHuman || !validateEmail(email)} // Disable based on more conditions
           >
             {loading ? (
               <>

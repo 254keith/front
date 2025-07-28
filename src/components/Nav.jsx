@@ -1,4 +1,4 @@
-// src/components/Nav.jsx
+// frontend/src/components/Nav.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import {
@@ -79,7 +79,7 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
-// Styled Components (No changes from your provided file)
+// Styled Components (from your provided code - no changes)
 const DojoSidebar = styled.nav`
   position: fixed;
   height: 100vh;
