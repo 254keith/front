@@ -762,6 +762,8 @@ import {
   fetchGenres,
   fetchAnimeList,
   fetchAnimeDetails,
+  fetchEpisodes,
+  fetchStream,
   searchAnime,
 } from "../api";
 import {
@@ -1276,23 +1278,47 @@ export default function Home() {
         if (!term) {
           setSearchResults([]);
           setActiveGenre(null);
+          setError(null);
           return;
         }
 
         try {
           setIsLoading(true);
+          setError(null);
+          setActiveGenre(null); // Clear active genre when searching
           const result = await searchAnime(term, 1);
           console.log(`🔎 searchAnime("${term}") →`, result);
-          const items = result.results || result.data?.results || result.data || [];
+          
+          // Handle different possible response structures
+          let items = [];
+          if (result && typeof result === 'object') {
+            if (Array.isArray(result)) {
+              items = result;
+            } else if (result.results && Array.isArray(result.results)) {
+              items = result.results;
+            } else if (result.data) {
+              if (Array.isArray(result.data)) {
+                items = result.data;
+              } else if (result.data.results && Array.isArray(result.data.results)) {
+                items = result.data.results;
+              }
+            }
+          }
+          
           const sorted = items.sort((a, b) =>
             sortOption === "A-Z"
               ? a.title.localeCompare(b.title)
               : b.title.localeCompare(a.title)
           );
           setSearchResults(sorted);
+          
+          if (sorted.length === 0) {
+            setError(`No results found for "${term}". Try a different search term.`);
+          }
         } catch (err) {
           console.error("Search error:", err);
-          setError("Search failed. Please try again.");
+          setError(`Search failed for "${term}". Please try again.`);
+          setSearchResults([]);
         } finally {
           setIsLoading(false);
         }
@@ -1315,50 +1341,67 @@ export default function Home() {
       if (activeGenre === genre) {
         setActiveGenre(null);
         setSearchResults([]);
+        setSearchTerm(""); // Clear search term when deselecting genre
         return;
       }
 
       setActiveGenre(genre);
+      setSearchTerm(""); // Clear search term when selecting genre
       try {
         setIsLoading(true);
+        setError(null);
         const res = await fetchAnimeList("genre", genre, 1);
         console.log(`🎨 fetchAnimeList("genre", "${genre}") →`, res);
 
-        // --- THE CRITICAL FIX IS HERE ---
-        // Your API response for genre filter needs to be explicitly accessed.
-        // Based on your previous JSON, it's likely within `res.data.mostPopular`
-        // or another specific category when a genre filter is applied.
+        // Handle different possible API response structures
         let genreFilteredList = [];
-        if (res.data) {
-          // You need to decide which list `res.data` will provide
-          // when filtered by genre. Your previous JSON had:
-          // res.data: {
-          //   "spotlight": [],
-          //   "trending": [],
-          //   "topAiring": [],
-          //   "mostPopular": [... anime list for 'josei' was here],
-          //   ...
-          // }
-          // So if `fetchAnimeList("genre", genre, 1)` gives you the full
-          // categorized object, you must pick the correct list.
-          // For now, let's assume it puts the filtered results into `mostPopular` or `trending`
-          // or a more specific `genreResults` property if your backend returns it that way.
-          genreFilteredList = res.data.mostPopular || res.data.trending || res.data.spotlight || [];
-
-          // If your backend changes to provide a dedicated 'filtered' list:
-          // genreFilteredList = res.data.filteredGenreResults || [];
-          // Or if the API directly returns the array when filtering by genre:
-          // genreFilteredList = res.data || [];
-        } else if (res.results) { // Fallback for `res.results` if API structure varies
-          genreFilteredList = res.results;
-        } else {
-          genreFilteredList = []; // Default to empty array
+        
+        if (res && typeof res === 'object') {
+          // Try different possible response structures
+          if (Array.isArray(res)) {
+            // Direct array response
+            genreFilteredList = res;
+          } else if (res.results && Array.isArray(res.results)) {
+            // Results property contains the array
+            genreFilteredList = res.results;
+          } else if (res.data) {
+            // Data property exists
+            if (Array.isArray(res.data)) {
+              // Data is directly an array
+              genreFilteredList = res.data;
+            } else if (res.data.results && Array.isArray(res.data.results)) {
+              // Data.results contains the array
+              genreFilteredList = res.data.results;
+            } else if (res.data.mostPopular && Array.isArray(res.data.mostPopular)) {
+              // Data.mostPopular contains the array
+              genreFilteredList = res.data.mostPopular;
+            } else if (res.data.trending && Array.isArray(res.data.trending)) {
+              // Data.trending contains the array
+              genreFilteredList = res.data.trending;
+            } else if (res.data.spotlight && Array.isArray(res.data.spotlight)) {
+              // Data.spotlight contains the array
+              genreFilteredList = res.data.spotlight;
+            } else {
+              // Try to find any array property in data
+              const arrayKeys = Object.keys(res.data).filter(key => Array.isArray(res.data[key]));
+              if (arrayKeys.length > 0) {
+                genreFilteredList = res.data[arrayKeys[0]];
+                console.log(`Using ${arrayKeys[0]} for genre results`);
+              }
+            }
+          }
         }
 
-        setSearchResults(genreFilteredList); // Set the explicitly extracted list
+        console.log(`Genre filtered list for "${genre}":`, genreFilteredList);
+        setSearchResults(genreFilteredList);
+        
+        if (genreFilteredList.length === 0) {
+          setError(`No anime found for genre "${genre}". Try a different genre.`);
+        }
       } catch (err) {
         console.error("Genre filter error:", err);
-        setError("Failed to filter by genre. Please try again.");
+        setError(`Failed to filter by genre "${genre}". Please try again.`);
+        setSearchResults([]);
       } finally {
         setIsLoading(false);
       }
@@ -1383,19 +1426,145 @@ export default function Home() {
     async (anime) => {
       try {
         setIsLoading(true);
-        const details = await fetchAnimeDetails(anime.id);
+        setError(null);
+        
+        // Fetch both anime details and episodes
+        const [details, episodes] = await Promise.all([
+          fetchAnimeDetails(anime.id),
+          fetchEpisodes(anime.id)
+        ]);
+        
         console.log("[API] fetchAnimeDetails →", details);
-        setModalAnime(details);
+        console.log("[API] fetchEpisodes →", episodes);
+        
+        // Handle different response structures for details
+        let animeDetails = details;
+        if (details && details.data) {
+          animeDetails = details.data;
+        }
+        
+        // Handle different response structures for episodes
+        let episodeList = [];
+        if (episodes && Array.isArray(episodes)) {
+          episodeList = episodes;
+        } else if (episodes && episodes.data && Array.isArray(episodes.data)) {
+          episodeList = episodes.data;
+        } else if (episodes && episodes.episodes && Array.isArray(episodes.episodes)) {
+          episodeList = episodes.episodes;
+        }
+        
+        // Combine the data
+        const fullAnimeData = {
+          ...animeDetails,
+          episodes: episodeList
+        };
+        
+        console.log("[API] Combined anime data →", fullAnimeData);
+        setModalAnime(fullAnimeData);
         setModalEpisode(null);
         setShowModal(true);
       } catch (err) {
         console.error("Modal load error:", err);
-        setError("Failed to load anime details.");
+        setError("Failed to load anime details. Please try again.");
+        // Still show the modal with basic info from the card
+        setModalAnime(anime);
+        setModalEpisode(null);
+        setShowModal(true);
       } finally {
         setIsLoading(false);
       }
     },
     []
+  );
+
+  const selectEpisode = useCallback(
+    async (episode) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log("[API] Selecting episode →", episode);
+        
+        // Check if episode already has a video URL
+        if (episode.videoUrl || episode.url) {
+          setModalEpisode(episode);
+          return;
+        }
+        
+        // Fetch video URL using fetchStream API
+        if (modalAnime && episode.id) {
+          // Try different parameter combinations
+          const streamParams = {
+            animeId: modalAnime.id,
+            episodeId: episode.id,
+            episodeNumber: episode.episodeNumber || episode.number
+          };
+          
+          console.log("[API] fetchStream params →", streamParams);
+          let streamData = null;
+          
+          try {
+            streamData = await fetchStream(streamParams);
+            console.log("[API] fetchStream response →", streamData);
+          } catch (err) {
+            console.log("[API] First fetchStream attempt failed, trying alternative params");
+            // Try alternative parameter names
+            const altParams = {
+              anime_id: modalAnime.id,
+              episode_id: episode.id,
+              episode_number: episode.episodeNumber || episode.number
+            };
+            try {
+              streamData = await fetchStream(altParams);
+              console.log("[API] fetchStream alt response →", streamData);
+            } catch (altErr) {
+              console.log("[API] Alternative fetchStream also failed");
+              throw altErr;
+            }
+          }
+          
+          // Handle different response structures for stream data
+          let videoUrl = null;
+          console.log("[DEBUG] Stream data structure:", streamData);
+          
+          if (streamData && streamData.url) {
+            videoUrl = streamData.url;
+            console.log("[DEBUG] Found videoUrl in streamData.url:", videoUrl);
+          } else if (streamData && streamData.data && streamData.data.url) {
+            videoUrl = streamData.data.url;
+            console.log("[DEBUG] Found videoUrl in streamData.data.url:", videoUrl);
+          } else if (streamData && streamData.videoUrl) {
+            videoUrl = streamData.videoUrl;
+            console.log("[DEBUG] Found videoUrl in streamData.videoUrl:", videoUrl);
+          } else if (streamData && streamData.sources && streamData.sources.length > 0) {
+            videoUrl = streamData.sources[0].url;
+            console.log("[DEBUG] Found videoUrl in streamData.sources[0].url:", videoUrl);
+          } else {
+            console.log("[DEBUG] No videoUrl found in streamData. Available keys:", Object.keys(streamData || {}));
+          }
+          
+          if (videoUrl) {
+            const episodeWithVideo = {
+              ...episode,
+              videoUrl: videoUrl
+            };
+            setModalEpisode(episodeWithVideo);
+          } else {
+            setError("Video URL not found for this episode.");
+            setModalEpisode(episode);
+          }
+        } else {
+          setModalEpisode(episode);
+        }
+      } catch (err) {
+        console.error("Episode selection error:", err);
+        setError("Failed to load video for this episode. Please try again.");
+        setModalEpisode(episode);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [modalAnime]
   );
 
   const loadMore = useCallback((type) => {
@@ -1508,6 +1677,27 @@ export default function Home() {
           onChange={handleSearch}
           placeholder="Search for anime..."
         />
+        {(searchTerm || activeGenre) && (
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setActiveGenre(null);
+              setSearchResults([]);
+              setError(null);
+            }}
+            style={{
+              background: "var(--accent)",
+              color: "var(--bg-primary)",
+              border: "none",
+              padding: "0.5rem 1rem",
+              borderRadius: "12px",
+              cursor: "pointer",
+              marginLeft: "0.5rem",
+            }}
+          >
+            Clear
+          </button>
+        )}
         <label htmlFor="sort" style={{ marginLeft: "1rem" }}>Sort:</label>
         <SortSelect
           id="sort"
@@ -1525,15 +1715,26 @@ export default function Home() {
         <FaFilter /> Genres
       </SectionTitle>
       <GenreFilterContainer>
-        {genres.slice(0, 15).map((g) => (
-          <GenreButton
-            key={g}
-            onClick={() => filterByGenre(g)}
-            active={activeGenre === g}
-          >
-            {g}
-          </GenreButton>
-        ))}
+        {genres.length > 0 ? (
+          genres.slice(0, 15).map((g) => (
+            <GenreButton
+              key={g}
+              onClick={() => filterByGenre(g)}
+              active={activeGenre === g}
+            >
+              {g}
+            </GenreButton>
+          ))
+        ) : (
+          <div style={{ 
+            textAlign: "center", 
+            padding: "1rem", 
+            color: "var(--text-secondary)",
+            fontSize: "0.9rem"
+          }}>
+            Loading genres...
+          </div>
+        )}
       </GenreFilterContainer>
 
       {/* Search/Filter Results */}
@@ -1541,44 +1742,87 @@ export default function Home() {
         <>
           <SectionTitle>
             Results {activeGenre && `for ${activeGenre}`}
+            {searchTerm && ` for "${searchTerm}"`}
           </SectionTitle>
-          {isLoading ? (
-            <div style={{ textAlign: "center", padding: "2rem" }}>Loading results...</div>
-          ) : searchResults.length > 0 ? (
-            <AnimeGrid>
-              {searchResults.map((a) => (
-                <AnimeCard key={a.id} onClick={() => openModal(a)}>
-                  <FavoriteButton
-                    favorited={!!favorites.find((x) => x.id === a.id)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFav(a);
-                    }}
-                  >
-                    <FaHeart />
-                  </FavoriteButton>
-                  <AnimeImage
-                    src={a.poster || a.image || "https://via.placeholder.com/200x300"}
-                    alt={a.title}
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.src = "https://via.placeholder.com/200x300";
-                    }}
-                  />
-                  <AnimeDetails>
-                    <AnimeTitle>{a.title}</AnimeTitle>
-                    <AnimeEpisode>
-                      Episodes: {a.episodes?.eps || a.episodes?.length || "N/A"}
-                    </AnimeEpisode>
-                  </AnimeDetails>
-                </AnimeCard>
-              ))}
-            </AnimeGrid>
-          ) : (
-            <p style={{ textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>
-              No results found for "{searchTerm || activeGenre}".
-            </p>
+          {error && (
+            <div style={{ 
+              textAlign: "center", 
+              padding: "1rem 2rem", 
+              color: "#ff6b6b", 
+              backgroundColor: "rgba(255, 107, 107, 0.1)",
+              borderRadius: "8px",
+              margin: "0 2rem 1rem 2rem"
+            }}>
+              {error}
+            </div>
           )}
+          {isLoading ? (
+            <div style={{ textAlign: "center", padding: "2rem" }}>
+              <div style={{ fontSize: "1.2rem", marginBottom: "1rem" }}>Loading results...</div>
+              <div style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
+                {activeGenre ? `Searching for ${activeGenre} anime...` : `Searching for "${searchTerm}"...`}
+              </div>
+            </div>
+          ) : searchResults.length > 0 ? (
+            <>
+              <div style={{ 
+                textAlign: "center", 
+                padding: "0 2rem 1rem 2rem", 
+                color: "var(--text-secondary)",
+                fontSize: "0.9rem"
+              }}>
+                Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </div>
+              <AnimeGrid>
+                {searchResults.map((a) => (
+                  <AnimeCard key={a.id} onClick={() => openModal(a)}>
+                    <FavoriteButton
+                      favorited={!!favorites.find((x) => x.id === a.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFav(a);
+                      }}
+                    >
+                      <FaHeart />
+                    </FavoriteButton>
+                    <AnimeImage
+                      src={a.poster || a.image || "https://via.placeholder.com/200x300"}
+                      alt={a.title}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/200x300";
+                      }}
+                    />
+                    <AnimeDetails>
+                      <AnimeTitle>{a.title}</AnimeTitle>
+                      <AnimeEpisode>
+                        Episodes: {a.episodes?.eps || a.episodes?.length || "N/A"}
+                      </AnimeEpisode>
+                    </AnimeDetails>
+                  </AnimeCard>
+                ))}
+              </AnimeGrid>
+            </>
+          ) : !error ? (
+            <div style={{ 
+              textAlign: "center", 
+              padding: "2rem", 
+              color: "var(--text-secondary)",
+              backgroundColor: "rgba(255, 255, 255, 0.05)",
+              borderRadius: "8px",
+              margin: "0 2rem"
+            }}>
+              <div style={{ fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+                No results found
+              </div>
+              <div style={{ fontSize: "0.9rem" }}>
+                {searchTerm ? `No anime found for "${searchTerm}"` : `No anime found for genre "${activeGenre}"`}
+              </div>
+              <div style={{ fontSize: "0.8rem", marginTop: "0.5rem", opacity: 0.7 }}>
+                Try a different search term or genre
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -1844,63 +2088,269 @@ export default function Home() {
       <Footer>&copy; {new Date().getFullYear()} AnimeStream</Footer>
 
       {/* Modal */}
-      {showModal && modalAnime && (
+      {showModal && (
         <ModalOverlay onClick={() => setShowModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <CloseButton onClick={() => setShowModal(false)}>×</CloseButton>
-            <h2>{modalAnime.title}</h2>
-            <p>{modalAnime.description || modalAnime.synopsis || "No description available."}</p>
-
-            {!modalEpisode && (
+            
+            {isLoading ? (
+              <div style={{ 
+                textAlign: "center", 
+                padding: "3rem",
+                color: "var(--text-secondary)"
+              }}>
+                <div style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>
+                  Loading anime details...
+                </div>
+                <div style={{ fontSize: "0.9rem" }}>
+                  Please wait while we fetch the information
+                </div>
+              </div>
+            ) : modalAnime ? (
               <>
-                <h3>Episodes</h3>
-                {modalAnime.episodes?.length ? (
-                  modalAnime.episodes.map((ep) => (
-                    <div
-                      key={ep.id || ep.episodeNumber} // Use id or episodeNumber as key
+                {/* Modal Header */}
+            <div style={{ 
+              display: "flex", 
+              gap: "1rem", 
+              marginBottom: "1.5rem",
+              alignItems: "flex-start"
+            }}>
+              <img
+                src={modalAnime.poster || modalAnime.image || "https://via.placeholder.com/150x200"}
+                alt={modalAnime.title}
+                style={{
+                  width: "150px",
+                  height: "200px",
+                  objectFit: "cover",
+                  borderRadius: "8px",
+                  flexShrink: 0
+                }}
+                onError={(e) => {
+                  e.target.src = "https://via.placeholder.com/150x200";
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <h2 style={{ margin: "0 0 0.5rem 0", color: "var(--accent)" }}>
+                  {modalAnime.title}
+                </h2>
+                <div style={{ 
+                  display: "flex", 
+                  gap: "1rem", 
+                  marginBottom: "1rem",
+                  fontSize: "0.9rem",
+                  color: "var(--text-secondary)"
+                }}>
+                  {modalAnime.status && <span>Status: {modalAnime.status}</span>}
+                  {modalAnime.type && <span>Type: {modalAnime.type}</span>}
+                  {modalAnime.episodes?.length && <span>Episodes: {modalAnime.episodes.length}</span>}
+                </div>
+                <div style={{ 
+                  display: "flex", 
+                  gap: "0.5rem", 
+                  flexWrap: "wrap",
+                  marginBottom: "1rem"
+                }}>
+                  {modalAnime.genres?.map((genre, index) => (
+                    <span
+                      key={index}
                       style={{
-                        padding: "0.5rem",
-                        cursor: "pointer",
-                        borderBottom: "1px solid var(--accent)",
-                        display: "flex",
-                        justifyContent: "space-between",
+                        background: "var(--accent)",
+                        color: "var(--bg-primary)",
+                        padding: "0.2rem 0.5rem",
+                        borderRadius: "4px",
+                        fontSize: "0.8rem"
                       }}
-                      onClick={() => setModalEpisode(ep)}
                     >
-                      <span>
-                        Episode {ep.episodeNumber}: {ep.title || `Episode ${ep.episodeNumber}`}
-                      </span>
-                      <span>{ep.duration || "24 min"}</span>
-                    </div>
-                  ))
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--accent)" }}>Description</h3>
+              <p style={{ 
+                lineHeight: "1.6", 
+                color: "var(--text-secondary)",
+                margin: 0
+              }}>
+                {modalAnime.description || modalAnime.synopsis || "No description available."}
+              </p>
+            </div>
+
+            {/* Episodes Section */}
+            {!modalEpisode && (
+              <div>
+                <h3 style={{ margin: "0 0 1rem 0", color: "var(--accent)" }}>
+                  Episodes ({modalAnime.episodes?.length || 0})
+                </h3>
+                {modalAnime.episodes?.length ? (
+                  <div style={{ 
+                    maxHeight: "300px", 
+                    overflowY: "auto",
+                    border: "1px solid var(--accent)",
+                    borderRadius: "8px"
+                  }}>
+                    {modalAnime.episodes.map((ep, index) => (
+                      <div
+                        key={ep.id || ep.episodeNumber || index}
+                        style={{
+                          padding: "0.8rem",
+                          cursor: "pointer",
+                          borderBottom: index < modalAnime.episodes.length - 1 ? "1px solid rgba(6,182,212,0.2)" : "none",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          transition: "background-color 0.2s ease"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = "rgba(6,182,212,0.1)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = "transparent";
+                        }}
+                        onClick={() => selectEpisode(ep)}
+                      >
+                        <div>
+                          <div style={{ fontWeight: "bold", marginBottom: "0.2rem" }}>
+                            Episode {ep.episodeNumber || index + 1}
+                          </div>
+                          <div style={{ 
+                            fontSize: "0.9rem", 
+                            color: "var(--text-secondary)",
+                            maxWidth: "300px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap"
+                          }}>
+                            {ep.title || `Episode ${ep.episodeNumber || index + 1}`}
+                          </div>
+                        </div>
+                        <div style={{ 
+                          fontSize: "0.8rem", 
+                          color: "var(--text-secondary)",
+                          textAlign: "right"
+                        }}>
+                          {ep.duration || "24 min"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <p>No episodes available yet.</p>
+                  <div style={{ 
+                    textAlign: "center", 
+                    padding: "2rem",
+                    color: "var(--text-secondary)",
+                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    borderRadius: "8px"
+                  }}>
+                    <div style={{ fontSize: "1.1rem", marginBottom: "0.5rem" }}>
+                      No episodes available
+                    </div>
+                    <div style={{ fontSize: "0.9rem" }}>
+                      Episodes will be added when they become available
+                    </div>
+                  </div>
                 )}
-              </>
+              </div>
             )}
 
-            {modalEpisode && modalEpisode.videoUrl && (
-              <div
-                style={{
-                  position: "relative",
-                  paddingBottom: "56.25%",
-                  height: 0,
-                  marginTop: "1rem",
-                }}
-              >
-                <iframe
-                  src={modalEpisode.videoUrl}
-                  title={`${modalAnime.title} Ep ${modalModalEpisode.episodeNumber}`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  style={{
-                    position: "absolute",
-                    width: "100%;",
-                    height: "100%;",
-                    border: 0,
-                    borderRadius: "8px",
-                  }}
-                />
+            {/* Video Player */}
+            {modalEpisode && (
+                  <div>
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center",
+                      marginBottom: "1rem"
+                    }}>
+                      <h3 style={{ margin: 0, color: "var(--accent)" }}>
+                        Episode {modalEpisode.episodeNumber}: {modalEpisode.title || `Episode ${modalEpisode.episodeNumber}`}
+                      </h3>
+                      <button
+                        onClick={() => setModalEpisode(null)}
+                        style={{
+                          background: "var(--accent)",
+                          color: "var(--bg-primary)",
+                          border: "none",
+                          padding: "0.5rem 1rem",
+                          borderRadius: "8px",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Back to Episodes
+                      </button>
+                    </div>
+                    
+                    {isLoading ? (
+                      <div style={{ 
+                        textAlign: "center", 
+                        padding: "3rem",
+                        color: "var(--text-secondary)"
+                      }}>
+                        <div style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>
+                          Loading video...
+                        </div>
+                        <div style={{ fontSize: "0.9rem" }}>
+                          Please wait while we fetch the video stream
+                        </div>
+                      </div>
+                    ) : modalEpisode.videoUrl ? (
+                  <div
+                    style={{
+                      position: "relative",
+                      paddingBottom: "56.25%",
+                      height: 0,
+                      marginTop: "1rem",
+                    }}
+                  >
+                    <iframe
+                      src={modalEpisode.videoUrl}
+                      title={`${modalAnime.title} Ep ${modalEpisode.episodeNumber}`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      style={{
+                        position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        border: 0,
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ 
+                    textAlign: "center", 
+                    padding: "3rem",
+                    color: "var(--text-secondary)",
+                    backgroundColor: "rgba(255, 255, 255, 0.05)",
+                    borderRadius: "8px"
+                  }}>
+                    <div style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>
+                      Video not available
+                    </div>
+                    <div style={{ fontSize: "0.9rem" }}>
+                      This episode's video is not currently available
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+              </>
+            ) : (
+              <div style={{ 
+                textAlign: "center", 
+                padding: "3rem",
+                color: "var(--text-secondary)"
+              }}>
+                <div style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>
+                  Failed to load anime details
+                </div>
+                <div style={{ fontSize: "0.9rem" }}>
+                  Please try again later
+                </div>
               </div>
             )}
           </ModalContent>
