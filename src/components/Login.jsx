@@ -117,10 +117,16 @@ const SubmitButton = styled.button`
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-top: 1rem;
-
-  &:hover {
+  
+  &:hover:not(:disabled) { /* Added :not(:disabled) */
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+  }
+  
+  &:disabled {
+    background: #555; /* Changed disabled background */
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 `;
 
@@ -176,17 +182,25 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setApiError('');
+    setApiError(''); // Clear previous errors
+    setSuccess(false); // Clear previous success messages
     setLoading(true);
     try {
       const data = await loginUser(formData);
-      if (data.token) {
-        localStorage.setItem('token', data.token);
+      // Assuming your backend sends a `token` or similar upon successful login
+      if (data.user) { // Check for `user` object as per your backend controller
+        // You might receive a token in a `data.token` field or similar
+        // If not, you might need to implement token generation in your backend and send it.
+        localStorage.setItem('user', JSON.stringify(data.user)); // Store user data (e.g., ID, username)
+        // localStorage.setItem('token', data.token); // If your backend returns a token
         setSuccess(true);
-        setTimeout(() => navigate('/'), 1500);
+        setTimeout(() => navigate('/'), 1500); // Redirect to home on success
+      } else {
+          setApiError("Login failed: Unexpected response from server."); // Generic error if no user data
       }
     } catch (err) {
-      setApiError(err.message);
+      console.error("Login API error:", err); // Log the full error for debugging
+      setApiError(err.message || 'Login failed. Please check your credentials.'); // Display user-friendly error
     } finally {
       setLoading(false);
     }
@@ -198,8 +212,8 @@ const Login = () => {
       <LoginBox>
         <Logo src={logo} alt="Anime Hub" />
         <Title>Welcome Back!</Title>
-        {apiError && <div style={{ color: '#ff4757', marginBottom: 12 }}>{apiError}</div>}
-        {success && <div style={{ color: '#2ed573', marginBottom: 12 }}>Login successful!</div>}
+        {apiError && <div style={{ color: '#ff4757', marginBottom: 12, textAlign: 'center' }}>{apiError}</div>}
+        {success && <div style={{ color: '#2ed573', marginBottom: 12, textAlign: 'center' }}>Login successful! Redirecting...</div>}
         <form onSubmit={handleSubmit}>
           <FormGroup>
             <Input
@@ -208,6 +222,7 @@ const Login = () => {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               required
+              disabled={loading} // Disable input while loading
             />
           </FormGroup>
           <FormGroup>
@@ -217,6 +232,7 @@ const Login = () => {
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               required
+              disabled={loading} // Disable input while loading
             />
             <PasswordToggle onClick={() => setShowPassword(!showPassword)}>
               {showPassword ? <FaEyeSlash /> : <FaEye />}

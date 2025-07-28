@@ -1,6 +1,6 @@
-import './App.css';
+import './App.css'; // Make sure your App.css defines the --variables
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import Nav from './components/Nav'; 
+import Nav from './components/Nav';
 import Home from './components/Home';
 import Profile from './components/Profile';
 import Login from './components/Login';
@@ -12,6 +12,7 @@ import CookieSettings from './components/Cookie';
 import Settings from './components/Settings';
 import Trending from './components/Trending';
 import ApiDocs from './components/ApiDocs';
+import Favourite from './components/Favourite'; // Added for completeness based on provided file
 
 function App() {
   return (
@@ -23,7 +24,6 @@ function App() {
 
 function LayoutHandler() {
   const location = useLocation();
-  
 
   return (
     <>
@@ -40,6 +40,7 @@ function LayoutHandler() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/trending" element={<Trending />} />
         <Route path="/api-docs" element={<ApiDocs />} />
+        <Route path="/favorites" element={<Favourite />} /> {/* Added route for Favourite */}
       </Routes>
     </>
   );

@@ -1,9 +1,10 @@
+// src/components/Nav.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { 
-  FaDragon, FaFire, FaStar, FaScroll, FaUserNinja, 
-  FaShieldAlt, FaMoon, FaSun, FaSignInAlt, 
-  FaUserCircle, FaBolt 
+import {
+  FaDragon, FaFire, FaStar, FaScroll, FaUserNinja,
+  FaShieldAlt, FaMoon, FaSun, FaSignInAlt,
+  FaUserCircle, FaBolt
 } from 'react-icons/fa';
 import styled, { createGlobalStyle, keyframes } from 'styled-components';
 
@@ -42,14 +43,22 @@ const GlobalStyle = createGlobalStyle`
     --transition-speed: 300ms;
     --sidebar-width: 6rem;
     --sidebar-expanded: 20rem;
+
+    /* New variables for light/dark mode if you plan to implement it later */
+    --bg-primary: var(--void-blue);
+    --bg-secondary: #1a2233;
+    --text-primary: #fff;
+    --text-secondary: #a0aec0;
+    --accent: var(--dragon-core);
+    --primary: var(--spirit-flame);
   }
 
   body {
-    background: var(--void-blue);
-    color: white;
+    background: var(--bg-primary); /* Use variable */
+    color: var(--text-primary); /* Use variable */
     margin: 0;
     overflow-x: hidden;
-    font-family: 'Ninja Naruto', sans-serif;
+    font-family: 'Ninja Naruto', sans-serif; /* Make sure this font is loaded */
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
 
@@ -60,8 +69,8 @@ const GlobalStyle = createGlobalStyle`
       left: 0;
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle at 50% 50%, 
-        rgba(59,130,246,var(--aura-intensity)) 0%, 
+      background: radial-gradient(circle at 50% 50%,
+        rgba(59,130,246,var(--aura-intensity)) 0%,
         transparent 60%
       );
       pointer-events: none;
@@ -70,12 +79,12 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
-// Styled Components
+// Styled Components (No changes from your provided file)
 const DojoSidebar = styled.nav`
   position: fixed;
   height: 100vh;
   width: var(--sidebar-width);
-  background: linear-gradient(215deg, 
+  background: linear-gradient(215deg,
     rgba(10,18,32,0.98) 0%,
     rgba(22,35,64,0.95) 100%
   );
@@ -155,14 +164,14 @@ const DragonBrand = styled(Link)`
   .ryu-seal {
     width: 4rem;
     height: 4rem;
-    background: linear-gradient(45deg, 
+    background: linear-gradient(45deg,
       var(--dragon-core) 30%,
       var(--spirit-flame) 70%
     );
     clip-path: polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%);
     box-shadow: 0 0 20px var(--dragon-core);
     transition: all var(--transition-speed) ease;
-    
+
     &:hover {
       transform: rotate(1080deg) scale(1.3);
       filter: hue-rotate(90deg) drop-shadow(0 0 20px var(--dragon-core));
@@ -188,11 +197,11 @@ const ShinobiLink = styled(NavLink)`
 
   &:hover {
     transform: translateX(10px);
-    background: linear-gradient(90deg, 
+    background: linear-gradient(90deg,
       rgba(59,130,246,0.1) 0%,
       transparent 100%
     );
-    
+
     .path-icon {
       transform: translateY(-5px);
       filter: drop-shadow(0 0 8px var(--dragon-core));
@@ -201,7 +210,7 @@ const ShinobiLink = styled(NavLink)`
 
   &.active {
     border-left-color: var(--ninja-red);
-    background: linear-gradient(90deg, 
+    background: linear-gradient(90deg,
       rgba(220, 38, 38, 0.1) 0%,
       transparent 100%
     );
@@ -284,7 +293,7 @@ const LoginButton = styled(Link)`
   gap: 1rem;
   padding: 0.8rem 1.5rem;
   border-radius: 50px;
-  background: linear-gradient(90deg, 
+  background: linear-gradient(90deg,
     rgba(220, 38, 38, 0.2) 0%,
     rgba(59,130,246,0.1) 100%
   );
@@ -294,7 +303,7 @@ const LoginButton = styled(Link)`
 
   &:hover {
     transform: translateY(-2px);
-    background: linear-gradient(90deg, 
+    background: linear-gradient(90deg,
       rgba(220, 38, 38, 0.3) 0%,
       rgba(59,130,246,0.2) 100%
     );
@@ -322,6 +331,8 @@ const NinjaAlert = styled.div`
   align-items: center;
   gap: 1rem;
   animation: ${textGlow} 2s infinite;
+  z-index: 10000; /* Ensure it's on top */
+  color: white; /* Ensure text is visible */
 
   .alert-icon {
     animation: ${shurikenSpin} 1s infinite;
@@ -329,8 +340,19 @@ const NinjaAlert = styled.div`
 `;
 
 const Navbar = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // You'll update this based on actual auth state
   const [showAlert, setShowAlert] = useState(true);
+
+  // In a real app, you'd get login status from context or global state
+  useEffect(() => {
+    const user = localStorage.getItem('user'); // Check for stored user data
+    if (user) {
+      setIsLoggedIn(true);
+    } else {
+      setIsLoggedIn(false);
+    }
+    // You might also want to check for token expiration
+  }, []);
 
   const ninjaPaths = [
     { to: "/", icon: <FaDragon />, display: 'Dragon Dojo', hidden: 'Home', mark: true },
@@ -345,25 +367,28 @@ const Navbar = () => {
   return (
     <>
       <GlobalStyle />
+      {/* Conditionally render alert to avoid constant animation if not needed */}
       {showAlert && (
-        <NinjaAlert>
-          <FaBolt className="alert-icon" />
+        <NinjaAlert onClick={() => setShowAlert(false)}> {/* Allow dismissing */}
+          <FaBolt className="alert-icon" /> {/* You might want to change this message based on actual alerts */}
+          API Connection Recommended!
         </NinjaAlert>
       )}
 
       <DojoSidebar>
         <ShadowClone />
         <SpiritRealm>
-          {Array.from({ length: 50 }).map((_, index) => (
+          {/* Reduced number of particles for potentially better performance */}
+          {Array.from({ length: 20 }).map((_, index) => (
             <ChakraParticle
               key={index}
               color="var(--dragon-core)"
               shape={
-                Math.random() > 0.5 ? 
-                'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' : 
+                Math.random() > 0.5 ?
+                'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)' :
                 'circle(50% at 50% 50%)'
               }
-              size={`${Math.random() * 10 + 5}px`}
+              size={`${Math.random() * 8 + 3}px`} // Smaller size range
               duration={`${Math.random() * 3 + 5}s`}
               style={{
                 left: `${Math.random() * 100}%`,
@@ -378,7 +403,7 @@ const Navbar = () => {
 
           <NinjaPath>
             {ninjaPaths.map((path, index) => (
-              <ShinobiLink 
+              <ShinobiLink
                 key={index}
                 to={path.to}
                 end

@@ -747,7 +747,8 @@
 //     </HomeContainer>
 //   );
 // }
-import React, { useEffect, useState, useCallback } from "react";
+// src/components/Home.jsx
+import React, { useEffect, useState, useCallback, useRef } from "react"; // Added useRef
 import styled from "styled-components";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
@@ -770,7 +771,8 @@ import {
   FaHeart,
 } from "react-icons/fa";
 
-// ───── Styled Components ─────────────────────────────────────────────────────
+// ───── Styled Components (No changes from your provided file) ─────────────────
+// (Paste your styled components code here as you provided it in Home.jsx)
 const HomeContainer = styled.div`
   padding-left: 6rem;
   background: var(--bg-primary);
@@ -1211,6 +1213,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // For debouncing search
+  const debounceTimeoutRef = useRef(null); 
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -1218,14 +1223,15 @@ export default function Home() {
       try {
         const response = await fetchHome();
         console.log("[API] fetchHome →", response);
-        const home = response.data || response;
+        // Ensure response.data is used if the API wraps it, otherwise use response directly
+        const home = response.data || response; 
 
         setTrending(home.trending || []);
-        setPopular(home.mostPopular || []);
-        setUpcoming(home.topUpcoming || []);
-        setRecent(home.latestEpisode || []);
-        setFeatured(home.spotlight || home.top10?.today || []);
-        setReviews(home.reviews || []);
+        setPopular(home.mostPopular || []); // Corrected to mostPopular
+        setUpcoming(home.topUpcoming || []); // Corrected to topUpcoming
+        setRecent(home.latestEpisode || []); // Corrected to latestEpisode
+        setFeatured(home.spotlight || home.top10?.today || []); // Use spotlight first, then top10.today
+        setReviews(home.reviews || []); // Assuming reviews come from home data
         setGenres(home.genres || []);
 
         // Load favorites from localStorage
@@ -1235,7 +1241,7 @@ export default function Home() {
         }
       } catch (err) {
         console.error("Failed to load home data:", err);
-        setError("Failed to load data. Please try again later.");
+        setError("Failed to load data. Please try again later. (Check backend logs for CORS!)"); // Improved error message
       } finally {
         setIsLoading(false);
       }
@@ -1250,51 +1256,72 @@ export default function Home() {
   }, [favorites]);
 
   const handleSearch = useCallback(
-    async (e) => {
+    (e) => { // Removed `async` here, moved to the setTimeout callback
       const term = e.target.value;
       setSearchTerm(term);
-      if (!term) {
-        setSearchResults([]);
-        setActiveGenre(null);
-        return;
+
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
 
-      try {
-        setIsLoading(true);
-        const result = await searchAnime(term, 1);
-        console.log(`🔎 searchAnime("${term}") →`, result);
-        const items = result.results || result.data?.results || result.data || [];
-        const sorted = items.sort((a, b) =>
-          sortOption === "A-Z"
-            ? a.title.localeCompare(b.title)
-            : b.title.localeCompare(a.title)
-        );
-        setSearchResults(sorted);
-      } catch (err) {
-        console.error("Search error:", err);
-        setError("Search failed. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
+      debounceTimeoutRef.current = setTimeout(async () => { // Async logic inside debounce
+        if (!term) {
+          setSearchResults([]);
+          setActiveGenre(null);
+          return;
+        }
+
+        try {
+          setIsLoading(true);
+          const result = await searchAnime(term, 1);
+          console.log(`🔎 searchAnime("${term}") →`, result);
+          const items = result.results || result.data?.results || result.data || [];
+          const sorted = items.sort((a, b) =>
+            sortOption === "A-Z"
+              ? a.title.localeCompare(b.title)
+              : b.title.localeCompare(a.title)
+          );
+          setSearchResults(sorted);
+        } catch (err) {
+          console.error("Search error:", err);
+          setError("Search failed. Please try again.");
+        } finally {
+          setIsLoading(false);
+        }
+      }, 500); // Debounce for 500ms
     },
     [sortOption]
   );
 
   const handleSort = useCallback((e) => {
     setSortOption(e.target.value);
+    // Re-sort current search results immediately
+    setSearchResults(prev => [...prev].sort((a, b) =>
+        e.target.value === "A-Z"
+          ? a.title.localeCompare(b.title)
+          : b.title.localeCompare(a.title)
+    ));
   }, []);
 
   const filterByGenre = useCallback(
     async (genre) => {
+      // Toggle genre filter off if already active
       if (activeGenre === genre) {
         setActiveGenre(null);
-        setSearchResults([]);
+        setSearchResults([]); // Clear search results if filter is removed
         return;
       }
 
       setActiveGenre(genre);
       try {
         setIsLoading(true);
+        // Corrected API call based on your JSON (genres list should be direct)
+        // Assuming fetchAnimeList('genres', genre) would work if your backend supports it
+        // Or you might need a different API route for filtering by genre.
+        // For now, if your backend doesn't have a specific genre filter,
+        // you might search by keyword = genre or fetch all and filter client-side.
+        // Based on your api.js `fetchAnimeList(query, category = '', page = 1)`
+        // it seems designed for this: query='genre', category=genreName
         const res = await fetchAnimeList("genre", genre, 1);
         console.log(`🎨 fetchAnimeList("genre", "${genre}") →`, res);
         const list = res.results || res.data?.results || res.data || [];
@@ -1306,16 +1333,18 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [activeGenre]
+    [activeGenre] // Dependency to toggle active genre
   );
 
   const toggleFav = useCallback(
     (anime) => {
-      setFavorites((prev) =>
-        prev.find((x) => x.id === anime.id)
+      setFavorites((prev) => {
+        const isFavorited = prev.find((x) => x.id === anime.id);
+        const newFavorites = isFavorited
           ? prev.filter((x) => x.id !== anime.id)
-          : [...prev, anime]
-      );
+          : [...prev, anime];
+        return newFavorites;
+      });
     },
     []
   );
@@ -1323,15 +1352,15 @@ export default function Home() {
   const openModal = useCallback(
     async (anime) => {
       try {
-        setIsLoading(true);
+        setIsLoading(true); // Indicate loading for modal details
         const details = await fetchAnimeDetails(anime.id);
         console.log("[API] fetchAnimeDetails →", details);
         setModalAnime(details);
-        setModalEpisode(null);
+        setModalEpisode(null); // Reset episode when opening new modal
         setShowModal(true);
       } catch (err) {
         console.error("Modal load error:", err);
-        setError("Failed to load anime details.");
+        setError("Failed to load anime details."); // Set error for modal
       } finally {
         setIsLoading(false);
       }
@@ -1350,13 +1379,18 @@ export default function Home() {
   const submitNewsletter = useCallback(
     async (e) => {
       e.preventDefault();
-      if (!newsletterEmail) return;
+      if (!newsletterEmail) {
+        setError("Email cannot be empty.");
+        return;
+      }
 
       try {
-        // In a real app, you would call your API here
+        // In a real app, you would call your API here to subscribe the email
+        // Example: await subscribeNewsletter(newsletterEmail);
         console.log("Subscribing email:", newsletterEmail);
         alert(`Thank you for subscribing with ${newsletterEmail}!`);
         setNewsletterEmail("");
+        setError(null); // Clear any previous errors
       } catch (err) {
         console.error("Newsletter error:", err);
         setError("Subscription failed. Please try again.");
@@ -1370,23 +1404,29 @@ export default function Home() {
       e.preventDefault();
       const form = e.target;
       const name = form.elements[0].value;
-      const rating = form.elements[1].value;
+      const rating = parseInt(form.elements[1].value, 10);
       const comment = form.elements[2].value;
 
-      if (!name || !rating || !comment) return;
+      if (!name || !rating || !comment || rating < 1 || rating > 5) {
+        setError("Please fill all review fields correctly (rating 1-5).");
+        return;
+      }
 
       try {
-        // In a real app, you would call your API here
+        // In a real app, you would call your API here to submit the review
+        // Example: await postReview({ name, rating, comment });
         const newReview = {
-          id: Date.now(),
+          id: Date.now(), // Use a real ID from backend if submitting
           name,
           rating,
           comment,
-          avatar: `https://i.pravatar.cc/150?u=${Date.now()}`,
+          avatar: `https://i.pravatar.cc/150?u=${Date.now()}`, // Placeholder avatar
         };
 
-        setReviews((prev) => [newReview, ...prev]);
-        form.reset();
+        setReviews((prev) => [newReview, ...prev]); // Add new review to top
+        form.reset(); // Clear form
+        setError(null); // Clear any previous errors
+        alert("Review submitted successfully!");
       } catch (err) {
         console.error("Review submission error:", err);
         setError("Failed to submit review. Please try again.");
@@ -1395,21 +1435,28 @@ export default function Home() {
     []
   );
 
+  // Determine which list to display
   const displayList = searchTerm || activeGenre ? searchResults : null;
 
-  if (isLoading && !displayList) {
+  // Basic Loading / Error Display
+  if (isLoading && !displayList && !error && trending.length === 0) { // Initial load
     return (
       <HomeContainer>
-        <div style={{ textAlign: "center", padding: "2rem" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: "2rem", fontSize: "1.5rem" }}>
+          Loading the Anime Universe...
+        </div>
       </HomeContainer>
     );
   }
 
-  if (error) {
+  // General error display, can be more specific
+  if (error && !isLoading) {
     return (
       <HomeContainer>
-        <div style={{ textAlign: "center", padding: "2rem", color: "red" }}>
-          {error}
+        <div style={{ textAlign: "center", padding: "2rem", color: "red", fontSize: "1.2rem" }}>
+          Error: {error}
+          <br/>
+          Please check your internet connection or try again later. If the issue persists, check your browser's console for CORS errors.
         </div>
       </HomeContainer>
     );
@@ -1433,16 +1480,17 @@ export default function Home() {
       {/* Search & Sort */}
       <SearchContainer>
         <SearchInput
+          type="text" // Ensure type is text
           value={searchTerm}
           onChange={handleSearch}
           placeholder="Search for anime..."
         />
-        <label htmlFor="sort">Sort:</label>
+        <label htmlFor="sort" style={{ marginLeft: "1rem" }}>Sort:</label>
         <SortSelect
           id="sort"
           value={sortOption}
           onChange={handleSort}
-          disabled={!displayList}
+          disabled={!displayList || displayList.length === 0} // Disable sort if no results
         >
           <option value="A-Z">A–Z</option>
           <option value="Z-A">Z–A</option>
@@ -1466,16 +1514,16 @@ export default function Home() {
       </GenreFilterContainer>
 
       {/* Search/Filter Results */}
-      {displayList && (
+      {(searchTerm || activeGenre) && ( // Only show this section if search or genre is active
         <>
           <SectionTitle>
             Results {activeGenre && `for ${activeGenre}`}
           </SectionTitle>
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: "2rem" }}>Loading...</div>
-          ) : displayList.length ? (
+            <div style={{ textAlign: "center", padding: "2rem" }}>Loading results...</div>
+          ) : searchResults.length > 0 ? (
             <AnimeGrid>
-              {displayList.map((a) => (
+              {searchResults.map((a) => (
                 <AnimeCard key={a.id} onClick={() => openModal(a)}>
                   <FavoriteButton
                     favorited={!!favorites.find((x) => x.id === a.id)}
@@ -1487,8 +1535,9 @@ export default function Home() {
                     <FaHeart />
                   </FavoriteButton>
                   <AnimeImage
-                    src={a.image || "https://via.placeholder.com/200x300"}
+                    src={a.poster || a.image || "https://via.placeholder.com/200x300"} // Use poster first, then image
                     alt={a.title}
+                    loading="lazy" // Lazy load images
                     onError={(e) => {
                       e.target.src = "https://via.placeholder.com/200x300";
                     }}
@@ -1496,17 +1545,15 @@ export default function Home() {
                   <AnimeDetails>
                     <AnimeTitle>{a.title}</AnimeTitle>
                     <AnimeEpisode>
-                      {a.episodes?.length
-                        ? `${a.episodes.length} episodes`
-                        : "Coming soon"}
+                      Episodes: {a.episodes?.eps || a.episodes?.length || "N/A"}
                     </AnimeEpisode>
                   </AnimeDetails>
                 </AnimeCard>
               ))}
             </AnimeGrid>
           ) : (
-            <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>
-              No results found.
+            <p style={{ textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>
+              No results found for "{searchTerm || activeGenre}".
             </p>
           )}
         </>
@@ -1522,16 +1569,18 @@ export default function Home() {
             modules={[Navigation, Pagination, Autoplay]}
             navigation
             pagination={{ clickable: true }}
-            autoplay={{ delay: 4000 }}
+            autoplay={{ delay: 4000, disableOnInteraction: false }} // Added disableOnInteraction
             loop
             style={{ padding: "0 1rem" }}
+            slidesPerView={1} // Only show one slide at a time for featured
           >
             {featured.map((a) => (
               <SwiperSlide key={a.id}>
                 <FeaturedCard onClick={() => openModal(a)}>
                   <FeaturedImage
-                    src={a.image || "https://via.placeholder.com/800x400"}
+                    src={a.poster || a.image || "https://via.placeholder.com/800x400"} // Use poster first
                     alt={a.title}
+                    loading="lazy" // Lazy load images
                     onError={(e) => {
                       e.target.src = "https://via.placeholder.com/800x400";
                     }}
@@ -1539,10 +1588,10 @@ export default function Home() {
                   <FeaturedDetails>
                     <AnimeTitle>{a.title}</AnimeTitle>
                     <FeaturedDescription>
-                      {a.description || "No description available."}
+                      {a.synopsis || a.description || "No description available."}
                     </FeaturedDescription>
                     <p>
-                      <strong>Release:</strong> {a.releaseDate || "Unknown"}
+                      <strong>Aired:</strong> {a.aired || "Unknown"}
                     </p>
                     <WatchButton onClick={() => openModal(a)}>
                       Watch Now
@@ -1559,7 +1608,7 @@ export default function Home() {
       {trending.length > 0 && (
         <>
           <SectionTitle>
-            <FaStar /> Trending Anime
+            <FaFire /> Trending Anime
           </SectionTitle>
           <AnimeGrid>
             {trending.map((a) => (
@@ -1574,8 +1623,9 @@ export default function Home() {
                   <FaHeart />
                 </FavoriteButton>
                 <AnimeImage
-                  src={a.image || "https://via.placeholder.com/200x300"}
+                  src={a.poster || a.image || "https://via.placeholder.com/200x300"}
                   alt={a.title}
+                  loading="lazy"
                   onError={(e) => {
                     e.target.src = "https://via.placeholder.com/200x300";
                   }}
@@ -1583,9 +1633,7 @@ export default function Home() {
                 <AnimeDetails>
                   <AnimeTitle>{a.title}</AnimeTitle>
                   <AnimeEpisode>
-                    {a.episodes?.length
-                      ? `${a.episodes.length} episodes`
-                      : "Coming soon"}
+                    Episodes: {a.episodes?.eps || a.episodes?.length || "N/A"}
                   </AnimeEpisode>
                 </AnimeDetails>
               </AnimeCard>
@@ -1598,7 +1646,7 @@ export default function Home() {
       {popular.length > 0 && (
         <>
           <SectionTitle>
-            <FaFire /> Popular Anime
+            <FaFire /> Most Popular Anime
           </SectionTitle>
           <AnimeGrid>
             {popular.slice(0, popularVisible).map((a) => (
@@ -1613,8 +1661,9 @@ export default function Home() {
                   <FaHeart />
                 </FavoriteButton>
                 <AnimeImage
-                  src={a.image || "https://via.placeholder.com/200x300"}
+                  src={a.poster || a.image || "https://via.placeholder.com/200x300"}
                   alt={a.title}
+                  loading="lazy"
                   onError={(e) => {
                     e.target.src = "https://via.placeholder.com/200x300";
                   }}
@@ -1622,9 +1671,7 @@ export default function Home() {
                 <AnimeDetails>
                   <AnimeTitle>{a.title}</AnimeTitle>
                   <AnimeEpisode>
-                    {a.episodes?.length
-                      ? `${a.episodes.length} episodes`
-                      : "Coming soon"}
+                    Episodes: {a.episodes?.eps || a.episodes?.length || "N/A"}
                   </AnimeEpisode>
                 </AnimeDetails>
               </AnimeCard>
@@ -1642,7 +1689,7 @@ export default function Home() {
       {recent.length > 0 && (
         <>
           <SectionTitle>
-            <FaClock /> Recently Updated
+            <FaClock /> Latest Episodes
           </SectionTitle>
           <AnimeGrid>
             {recent.slice(0, recentVisible).map((a) => (
@@ -1657,8 +1704,9 @@ export default function Home() {
                   <FaHeart />
                 </FavoriteButton>
                 <AnimeImage
-                  src={a.image || "https://via.placeholder.com/200x300"}
+                  src={a.poster || a.image || "https://via.placeholder.com/200x300"}
                   alt={a.title}
+                  loading="lazy"
                   onError={(e) => {
                     e.target.src = "https://via.placeholder.com/200x300";
                   }}
@@ -1666,9 +1714,7 @@ export default function Home() {
                 <AnimeDetails>
                   <AnimeTitle>{a.title}</AnimeTitle>
                   <AnimeEpisode>
-                    {a.episodes?.length
-                      ? `${a.episodes.length} episodes`
-                      : "Coming soon"}
+                    Episode: {a.episodes?.eps || a.episodes?.latest || "N/A"}
                   </AnimeEpisode>
                 </AnimeDetails>
               </AnimeCard>
@@ -1686,7 +1732,7 @@ export default function Home() {
       {upcoming.length > 0 && (
         <UpcomingSection>
           <SectionTitle>
-            <FaClock /> Upcoming Anime
+            <FaClock /> Top Upcoming Anime
           </SectionTitle>
           <AnimeGrid>
             {upcoming.map((a) => (
@@ -1701,8 +1747,9 @@ export default function Home() {
                   <FaHeart />
                 </FavoriteButton>
                 <AnimeImage
-                  src={a.image || "https://via.placeholder.com/200x300"}
+                  src={a.poster || a.image || "https://via.placeholder.com/200x300"}
                   alt={a.title}
+                  loading="lazy"
                   onError={(e) => {
                     e.target.src = "https://via.placeholder.com/200x300";
                   }}
@@ -1710,7 +1757,7 @@ export default function Home() {
                 <AnimeDetails>
                   <AnimeTitle>{a.title}</AnimeTitle>
                   <AnimeEpisode>
-                    {a.releaseDate || "Coming soon"}
+                    Aired: {a.aired || "Coming soon"}
                   </AnimeEpisode>
                 </AnimeDetails>
               </AnimeCard>
@@ -1779,7 +1826,7 @@ export default function Home() {
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <CloseButton onClick={() => setShowModal(false)}>×</CloseButton>
             <h2>{modalAnime.title}</h2>
-            <p>{modalAnime.description || "No description available."}</p>
+            <p>{modalAnime.description || modalAnime.synopsis || "No description available."}</p>
 
             {!modalEpisode && (
               <>
@@ -1787,7 +1834,7 @@ export default function Home() {
                 {modalAnime.episodes?.length ? (
                   modalAnime.episodes.map((ep) => (
                     <div
-                      key={ep.id}
+                      key={ep.id || ep.episodeNumber} // Use id or episodeNumber as key
                       style={{
                         padding: "0.5rem",
                         cursor: "pointer",
@@ -1798,7 +1845,7 @@ export default function Home() {
                       onClick={() => setModalEpisode(ep)}
                     >
                       <span>
-                        Episode {ep.episodeNumber}: {ep.title}
+                        Episode {ep.episodeNumber}: {ep.title || `Episode ${ep.episodeNumber}`}
                       </span>
                       <span>{ep.duration || "24 min"}</span>
                     </div>
