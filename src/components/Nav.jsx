@@ -208,7 +208,7 @@ const ShinobiLink = styled(NavLink)`
     }
   }
 
-  &.active {
+  &.active  {
     border-left-color: var(--ninja-red);
     background: linear-gradient(90deg,
       rgba(220, 38, 38, 0.1) 0%,
@@ -324,7 +324,7 @@ const NinjaAlert = styled.div`
   position: fixed;
   top: 1rem;
   right: 1rem;
-  background: rgba(220, 38, 38, 0.9);
+  background: rgba(61, 67, 141, 0.9);
   padding: 1rem 2rem;
   border-radius: 4px;
   display: flex;

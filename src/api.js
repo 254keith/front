@@ -200,7 +200,7 @@ export async function getOauthUrl(provider) {
 }
 
 export async function fetchApiDocs() {
-    return fetchData(`${API_BASE}/`);
+    return fetchData(`${API_BASE}`);
 }
 
 export const fetchAnimeById = async (id) => {

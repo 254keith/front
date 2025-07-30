@@ -194,8 +194,8 @@ const GenresContainer = styled.div`
 `;
 
 const GenreButton = styled.button`
-  background: ${props => props.active ? 'var(--accent)' : 'transparent'};
-  color: ${props => props.active ? 'var(--bg-primary)' : 'var(--accent)'};
+  background: ${props => props.$active ? 'var(--accent)' : 'transparent'};
+  color: ${props => props.$active ? 'var(--bg-primary)' : 'var(--accent)'};
   border: 2px solid var(--accent);
   border-radius: 25px;
   padding: 0.6rem 1.2rem;

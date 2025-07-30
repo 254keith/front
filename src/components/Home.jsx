@@ -45,22 +45,42 @@ const Container = styled.div`
 `;
 
 const Hero = styled.section`
-  background: linear-gradient(
-    135deg,
-    rgba(15, 23, 42, 0.95),
-    rgba(15, 23, 42, 0.8)
-  ),
-  url('https://images.unsplash.com/photo-1578662996442-48f60103fc96?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')
-    no-repeat center/cover;
+  position: relative;
   height: 70vh;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  position: relative;
+  overflow: hidden;
+`;
+
+const BackgroundVideo = styled.video`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+`;
+
+const Overlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.95),
+    rgba(15, 23, 42, 0.7)
+  );
+  z-index: 2;
 `;
 
 const HeroContent = styled.div`
+  position: relative;
+  z-index: 3;
   max-width: 800px;
   padding: 2rem;
 `;
@@ -100,6 +120,7 @@ const HeroButton = styled.button`
     box-shadow: 0 10px 20px rgba(6, 182, 212, 0.3);
   }
 `;
+
 
 const SearchSection = styled.section`
   padding: 2rem;
@@ -194,8 +215,8 @@ const GenresContainer = styled.div`
 `;
 
 const GenreButton = styled.button`
-  background: ${props => props.active ? 'var(--accent)' : 'transparent'};
-  color: ${props => props.active ? 'var(--bg-primary)' : 'var(--accent)'};
+  background: ${props => props.$active ? 'var(--accent)' : 'transparent'};
+  color: ${props => props.$active ? 'var(--bg-primary)' : 'var(--accent)'};
   border: 2px solid var(--accent);
   border-radius: 25px;
   padding: 0.6rem 1.2rem;
@@ -912,62 +933,87 @@ export default function Home() {
   const handleSearch = useCallback((e) => {
     const term = e.target.value;
     setSearchTerm(term);
-
+    console.log('[Search] Input changed to:', term);
+  
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-
+  
     searchTimeoutRef.current = setTimeout(async () => {
       if (!term.trim()) {
+        console.log('[Search] Empty search term, clearing results.');
         setSearchResults([]);
         setActiveGenre(null);
         setError(null);
         return;
       }
-
+  
       try {
         setIsLoading(true);
         setError(null);
         setActiveGenre(null); // Clear active genre when searching
-
+  
+        console.log('[Search] Searching for:', term);
         const result = await searchAnime(term, 1);
-        console.log('[API] Search results:', result);
-
+        console.log('[API] Raw search result:', result);
+  
         let items = [];
         if (result && typeof result === 'object') {
-          if (Array.isArray(result)) { // API returns array directly
+          if (Array.isArray(result)) {
             items = result;
-          } else if (result.results && Array.isArray(result.results)) { // Results in 'results' key
+          } else if (result.results && Array.isArray(result.results)) {
             items = result.results;
-          } else if (result.data) { // Results in 'data' key (could be array or object with 'results')
+          } else if (result.data) {
+            // ✅ Look for response inside data
             if (Array.isArray(result.data)) {
               items = result.data;
+            } else if (Array.isArray(result.data.response)) {
+              items = result.data.response;
             } else if (result.data.results && Array.isArray(result.data.results)) {
               items = result.data.results;
             }
           }
         }
-
-        const sorted = items.sort((a, b) =>
+        
+  
+        console.log('[Search] Total items received from API:', items.length);
+  
+        // ✅ Filter results by search term
+        const filtered = items.filter((anime) => {
+          const title = anime.title?.toLowerCase() || '';
+          const altTitle = anime.alternativeTitle?.toLowerCase() || '';
+          return title.includes(term.toLowerCase()) || altTitle.includes(term.toLowerCase());
+        });
+  
+        console.log(`[Search] Items matching "${term}":`, filtered.length);
+  
+        // ✅ Sort filtered results
+        const sorted = filtered.sort((a, b) =>
           sortOption === 'A-Z'
-            ? (a.title || '').localeCompare(b.title || '') // Handle potential null titles
+            ? (a.title || '').localeCompare(b.title || '')
             : (b.title || '').localeCompare(a.title || '')
         );
-
+  
+        console.log('[Search] Sorted filtered results:', sorted);
+  
         setSearchResults(sorted);
-
+  
         if (sorted.length === 0) {
           setError(`No results found for "${term}"`);
+          console.log('[Search] No matches found.');
         }
       } catch (err) {
-        console.error('Search error:', err);
+        console.error('[Search Error]', err);
         setError(`Search failed for "${term}". Please try again.`);
         setSearchResults([]);
       } finally {
         setIsLoading(false);
+        console.log('[Search] Search finished.');
       }
     }, 500);
   }, [sortOption]);
+  
+  
 
   // Replace handleGenreFilter with filterByGenre
   const filterByGenre = useCallback(
@@ -1420,16 +1466,23 @@ export default function Home() {
     <Container>
       {/* Hero Section */}
       <Hero>
-        <HeroContent>
-          <HeroTitle>Welcome to AnimeStream</HeroTitle>
-          <HeroSubtitle>
-            Discover and stream your favorite anime with high-quality video and an extensive library
-          </HeroSubtitle>
-          <HeroButton onClick={() => genresRef.current && genresRef.current.scrollIntoView({ behavior: 'smooth' })}>
-            <FaPlay /> Start Exploring
-          </HeroButton>
-        </HeroContent>
-      </Hero>
+      <BackgroundVideo autoPlay muted loop playsInline>
+        <source src="./Free-Anime-Background-Video.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </BackgroundVideo>
+
+      <Overlay />
+
+      <HeroContent>
+        <HeroTitle>Welcome to AnimeStream</HeroTitle>
+        <HeroSubtitle>
+          Discover and stream your favorite anime with high-quality video and an extensive library
+        </HeroSubtitle>
+        <HeroButton onClick={() => genresRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+          <FaPlay /> Start Exploring
+        </HeroButton>
+      </HeroContent>
+    </Hero>
 
       {/* Search Section */}
       <SearchSection>
